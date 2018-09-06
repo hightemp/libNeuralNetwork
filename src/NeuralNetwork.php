@@ -28,7 +28,7 @@ class NeuralNetwork
       "momentum" => 0.1,        // multiply's against the specified "change" then adds to learning rate for change
       "callback" => null,       // a periodic call back that can be triggered while training
       "callbackPeriod" => 10,   // the number of iterations through the training data between callback calls
-      "timeout" => 0            // the max number of milliseconds to train for
+      "timeout" => -1           // the max number of milliseconds to train for
     ];
   }
   
@@ -177,7 +177,8 @@ class NeuralNetwork
     return true;
   }
   
-  public function fnRun($aInput) {
+  public function fnRun($aInput) 
+  {
     //if (!$this->isRunnable) return null;
     if ($this->inputLookup) {
       $aInput = Lookup::fnToArray($this->inputLookup, $aInput);
@@ -189,5 +190,226 @@ class NeuralNetwork
       $aOutput = Lookup::fnToHash($this->outputLookup, $aOutput);
     }
     return $aOutput;
+  }
+  
+  public function fnRunInputSigmoid($aInput) 
+  {
+    $this->outputs[0] = $aInput;  // set output state of input layer
+
+    $aOutput = null;
+    
+    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $aWeights = $this->weights[$iLayer][$iNode];
+
+        $iSum = $this->biases[$iLayer][$iNode];
+        for ($iK = 0; $iK < count($aWeights); $iK++) {
+          $iSum += $aWeights[$iK] * $aInput[$iK];
+        }
+        //sigmoid
+        $this->outputs[$iLayer][$iNode] = 1 / (1 + Math.exp(-$iSum));
+      }
+      $aOutput = $aInput = $this->outputs[$iLayer];
+    }
+    
+    return $aOutput;
+  }
+  
+  public function fnRunInputRelu($aInput) 
+  {
+    $this->outputs[0] = $aInput;  // set output state of input layer
+
+    $aOutput = null;
+    
+    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $aWeights = $this->weights[$iLayer][$iNode];
+
+        $iSum = $this->biases[$iLayer][$iNode];
+        for ($iK = 0; $iK < count($aWeights); $iK++) {
+          $iSum += $aWeights[$iK] * $aInput[$iK];
+        }
+        //relu
+        $this->outputs[$iLayer][$iNode] = ($iSum < 0 ? 0 : $iSum);
+      }
+      $aOutput = $aInput = $this->outputs[$iLayer];
+    }
+    
+    return $aOutput;
+  }
+  
+  public function fnRunInputLeakyRelu($aInput) 
+  {
+    $this->outputs[0] = $aInput;  // set output state of input layer
+
+    $aOutput = null;
+    
+    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $aWeights = $this->weights[$iLayer][$iNode];
+
+        $iSum = $this->biases[$iLayer][$iNode];
+        for ($iK = 0; $iK < count($aWeights); $iK++) {
+          $iSum += $aWeights[$iK] * $aInput[$iK];
+        }
+        //relu
+        $this->outputs[$iLayer][$iNode] = ($iSum < 0 ? 0 : 0.01 * $iSum);
+      }
+      $aOutput = $aInput = $this->outputs[$iLayer];
+    }
+    
+    return $aOutput;
+  }
+  
+  public function fnRunInputTanh($aInput) 
+  {
+    $this->outputs[0] = $aInput;  // set output state of input layer
+
+    $aOutput = null;
+    
+    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $aWeights = $this->weights[$iLayer][$iNode];
+
+        $iSum = $this->biases[$iLayer][$iNode];
+        for ($iK = 0; $iK < count($aWeights); $iK++) {
+          $iSum += $aWeights[$iK] * $aInput[$iK];
+        }
+        //tanh
+        $this->outputs[$iLayer][$iNode] = Math.tanh($iSum);
+      }
+      $aOutput = $aInput = $this->outputs[$iLayer];
+    }
+    
+    return $aOutput;
+  }
+  
+  public function fnVerifyIsInitialized($aData) 
+  {
+    if ($this->sizes) return;
+
+    $this->sizes = [];
+    array_push($this->sizes, count($aData[0]['input']));
+    if (!$this->hiddenSizes) {
+      array_push($this->sizes, Math.max(3, Math.floor(count($aData[0]['input']) / 2)));
+    } else {
+      foreach ($this->hiddenSizes as $iSize) {
+        array_push($this->sizes, $iSize);
+      }
+    }
+    array_push($this->sizes, count($aData[0]['output']));
+
+    $this->fnInitialize();
+  }
+  
+  public function fnUpdateTrainingOptions($aOptions) 
+  {
+    foreach (self::fnTrainDefaults() as $sKey => $mValue) {
+      $this->trainOpts[$sKey] = isset($aOptions[$sKey]) ? $aOptions[$sKey] : $this->trainOpts[$sKey];
+    }
+    
+    self::fnValidateTrainingOptions($this->trainOpts);
+    
+    $this->fnSetLogMethod($aOptions['log'] || $this->trainOpts['log']);
+    $this->activation = $aOptions['activation'] || $this->activation;
+  }
+  
+  public function getTrainOptsJSON()
+  {
+    return array_reduce(
+      array_keys(self::fnTrainDefaults()),
+      function ($aOptions, $sOption) {
+        if ($sOption === 'timeout' && $this->trainOpts[$sOption] === -1) 
+          return $aOptions;
+        if ($this->trainOpts[$sOption]) 
+          $aOptions[$sOption] = $this->trainOpts[$sOption];
+        if ($sOption === 'log') 
+          $aOptions['log'] = is_callable($aOptions['log']);
+        return $aOptions;
+      },
+      []
+    );
+  }
+  
+  public function fnSetLogMethod($mLog) 
+  {
+    if (is_callable($mLog)){
+      $this->trainOpts['log'] = $mLog;
+    } else if ($mLog) {
+      $this->trainOpts['log'] = function($v) { echo $v."\n"; };
+    } else {
+      $this->trainOpts['log'] = false;
+    }
+  }
+  
+  public function fnCalculateTrainingError($aData) 
+  {
+    $iSum = 0;
+    
+    for ($iI = 0; $iI < count($aData); ++$iI) {
+      $iSum += $this->fnTrainPattern($aData[$iI]['input'], $aData[$iI]['output'], true);
+    }
+    
+    return $iSum / count($aData);
+  }
+  
+  public function fnTrainPatterns($aData) 
+  {
+    for ($iI = 0; $iI < count($aData); ++$iI) {
+      $this->fnTrainPattern($aData[$iI]['input'], $aData[$iI]['output'], false);
+    }
+  }
+  
+  public function fnTrainingTick($aData, $aStatus, $iEndTime) 
+  {
+    if ($aStatus['iterations'] >= $this->trainOpts['iterations'] || $aStatus['error'] <= $this->trainOpts['errorThresh'] || time() >= $iEndTime) {
+      return false;
+    }
+
+    $aStatus['iterations']++;
+
+    if ($this->trainOpts['log'] && ($aStatus['iterations'] % $this->trainOpts['logPeriod'] === 0)) {
+      $aStatus['error'] = $this->fnCalculateTrainingError($aData);
+      $this->trainOpts.log("iterations: {$aStatus['iterations']}, training error: {$aStatus['error']}");
+    } else {
+      if ($aStatus['iterations'] % $this->errorCheckInterval === 0) {
+        $aStatus['error'] = $this->fnCalculateTrainingError($aData);
+      } else {
+        $this->fnTrainPatterns($aData);
+      }
+    }
+
+    if ($this->trainOpts['callback'] && ($aStatus['iterations'] % $this->trainOpts['callbackPeriod'] === 0)) {
+      $this->trainOpts['callback']($aStatus);
+    }
+    return true;
+  }
+  
+  public function fnPrepTraining($aData, $aOptions) 
+  {
+    $this->fnUpdateTrainingOptions($aOptions);
+    $aData = $this->fnFormatData($aData);
+    $iEndTime = time() + $this->trainOpts['timeout'];
+
+    $aStatus = [
+      "error" => 1,
+      "iterations" => 0
+    ];
+
+    $this->fnVerifyIsInitialized($aData);
+
+    return [
+      "aData" => $aData,
+      "aStatus" => $aStatus,
+      "iEndTime" => $iEndTime
+    ];
+  }
+  
+  public function fnTrain($aData, $aOptions = []) 
+  {
+    extract($this->fnPrepTraining($aData, $aOptions));
+
+    while ($this->fnTrainingTick($aData, $aStatus, $iEndTime));
+    return status;
   }
 }

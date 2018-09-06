@@ -1,5 +1,7 @@
 <?php
 
+namespace libNeuralNetwork;
+
 class Lookup
 {
   
