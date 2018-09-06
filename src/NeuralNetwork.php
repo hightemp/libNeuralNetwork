@@ -412,4 +412,186 @@ class NeuralNetwork
     while ($this->fnTrainingTick($aData, $aStatus, $iEndTime));
     return status;
   }
+  
+  /*
+  trainAsync(data, options = {}) {
+    let status, endTime;
+    ({ data, status, endTime } = $this->_prepTraining(data, options));
+
+    return new Promise((resolve, reject) => {
+      try {
+        const thawedTrain = new Thaw(new Array($this->trainOpts.iterations), {
+          delay: true,
+          each: () => $this->_trainingTick(data, status, endTime) || thawedTrain.stop(),
+          done: () => resolve(status)
+        });
+        thawedTrain.tick();
+      } catch (trainError) {
+        reject({trainError, status});
+      }
+    });
+  }
+   */
+  
+  public function fnTrainPattern($aInput, $aTarget, $blogErrorRate) 
+  {
+    // forward propagate
+    $this->fnRunInput($aInput);
+
+    // back propagate
+    $this->fnCalculateDeltas($aTarget);
+    $this->fnAdjustWeights();
+
+    if ($blogErrorRate) {
+      return mse($this->errors[$this->outputLayer]);
+    } else {
+      return null;
+    }
+  }
+  
+  public function fnCalculateDeltasSigmoid($aTarget) 
+  {
+    for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $iOutput = $this->outputs[$iLayer][$iNode];
+
+        $iError = 0;
+        if ($iLayer === $this->outputLayer) {
+          $iError = $aTarget[$iNode] - $iOutput;
+        } else {
+          $aDeltas = $this->deltas[$iLayer + 1];
+          for ($iK = 0; $iK < count($aDeltas); $iK++) {
+            $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
+          }
+        }
+        $this->errors[$iLayer][$iNode] = $iError;
+        $this->deltas[$iLayer][$iNode] = $iError * $iOutput * (1 - $iOutput);
+      }
+    }
+  }
+  
+  public function fnCalculateDeltasRelu($aTarget) 
+  {
+    for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $iOutput = $this->outputs[$iLayer][$iNode];
+
+        $iError = 0;
+        if ($iLayer === $this->outputLayer) {
+          $iError = $aTarget[$iNode] - $iOutput;
+        } else {
+          $aDeltas = $this->deltas[$iLayer + 1];
+          for ($iK = 0; $iK < count($aDeltas); $iK++) {
+            $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
+          }
+        }
+        $this->errors[$iLayer][$iNode] = $iError;
+        $this->deltas[$iLayer][$iNode] = $iOutput > 0 ? $iError : 0;
+      }
+    }
+  }
+  
+  public function fnCalculateDeltasLeakyRelu($aTarget) 
+  {
+    for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $iOutput = $this->outputs[$iLayer][$iNode];
+
+        $iError = 0;
+        if ($iLayer === $this->outputLayer) {
+          $iError = $aTarget[$iNode] - $iOutput;
+        } else {
+          $aDeltas = $this->deltas[$iLayer + 1];
+          for ($iK = 0; $iK < count($aDeltas); $iK++) {
+            $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
+          }
+        }
+        $this->errors[$iLayer][$iNode] = $iError;
+        $this->deltas[$iLayer][$iNode] = $iOutput > 0 ? $iError : 0.01 * $iError;
+      }
+    }
+  }
+
+  public function fnCalculateDeltasTanh($aTarget) 
+  {
+    for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $iOutput = $this->outputs[$iLayer][$iNode];
+
+        $iError = 0;
+        if ($iLayer === $this->outputLayer) {
+          $iError = $aTarget[$iNode] - $iOutput;
+        } else {
+          $aDeltas = $this->deltas[$iLayer + 1];
+          for ($iK = 0; $iK < count($aDeltas); $iK++) {
+            $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
+          }
+        }
+        $this->errors[$iLayer][$iNode] = $iError;
+        $this->deltas[$iLayer][$iNode] = (1 - $iOutput * $iOutput) * $iError;
+      }
+    }
+  }
+  
+  public function fnAdjustWeights() 
+  {
+    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+      $iIncoming = $this->outputs[$iLayer - 1];
+
+      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+        $iDelta = $this->deltas[$iLayer][$iNode];
+
+        for ($iK = 0; $iK < count($iIncoming); $iK++) {
+          $iChange = $this->changes[$iLayer][$iNode][$iK];
+
+          $iChange = ($this->trainOpts['learningRate'] * $iDelta * $iIncoming[$iK])
+            + ($this->trainOpts['momentum'] * $iChange);
+
+          $this->changes[$iLayer][$iNode][$iK] = $iChange;
+          $this->weights[$iLayer][$iNode][$iK] += $iChange;
+        }
+        $this->biases[$iLayer][$iNode] += $this->trainOpts['learningRate'] * delta;
+      }
+    }
+  }
+  
+  public function fnFormatData($aData) 
+  {
+    if (!is_array($aData)) { // turn stream datum into array
+      $aData = [$aData];
+    }
+    // turn sparse hash input into arrays with 0s as filler
+    $mDatum = $aData[0]['input'];
+    if (!is_array($mDatum)) {
+      if (!$this->inputLookup) {
+        $this->inputLookup = Lookup::fnBuildLookup(
+          array_map(function($v) { return $v['input']; }, $aData)
+        );
+      }
+      $aData = array_map(
+        function($v) 
+        {
+          $aArray = Lookup::fnToArray($this->inputLookup, $v['input']);
+          return array_merge($v, [ 'input' => $aArray ]);
+        }
+      );
+    }
+
+    if (!is_array($aData[0]['output'])) {
+      if (!$this->outputLookup) {
+        $this->outputLookup = Lookup::fnBuildLookup(
+          array_map(function($v) { return $v['output']; })
+        );
+      }
+      $aData = array_map(
+        function($v) 
+        {
+          $aArray = Lookup::fnToArray($this->outputLookup, $v['output']);
+          return array_merge($v, [ 'output' => $aArray ]);
+        }
+      );
+    }
+    
+    return $aData;
+  }
 }
