@@ -285,4 +285,71 @@ class Matrix
       $oLeft->deltas[$iI] = (1 - $fMWI * $fMWI) * $oProduct->deltas[$iI];
     }
   }
+  
+  public static function fnSoftmax($oM) 
+  {
+    $oResult = new Matrix($oM->rows, $oM->columns); // probability volume
+    $iMaxVal = -999999;
+    for ($iI = 0; $iI < count($oM->weights); $iI++) {
+      if($oM->weights[$iI] > $iMaxVal) {
+        $iMaxVal = $oM->weights[$iI];
+      }
+    }
+
+    $iS = 0;
+    for ($iI = 0; $iI < count($oM->weights); $iI++) {
+      $oResult->weights[$iI] = exp($oM->weights[$iI] - $iMaxVal);
+      $iS += $oResult->weights[$iI];
+    }
+
+    for ($iI = 0; $iI < count($oM->weights); $iI++) {
+      $oResult->weights[$iI] /= $iS;
+    }
+
+    // no backward pass here needed
+    // since we will use the computed probabilities outside
+    // to set gradients directly on m
+    return $oResult;
+  }
+  
+  public static function fnCopy(&$oProduct, &$oLeft) 
+  {
+    $oProduct->rows = $oLeft->rows;
+    $oProduct->columns = $oLeft->columns;
+    $oProduct->weights = $oLeft->weights;
+    $oProduct->deltas = $oLeft->deltas;
+  }
+  
+  public static function fnSampleI($oM) 
+  {
+    // sample argmax from w, assuming w are
+    // probabilities that sum to one
+    $iR = Utilities::fnRandomF(0, 1);
+    $iX = 0;
+    $iI = 0;
+    $aW = $oM->weights;
+
+    while (true) {
+      $iX += $aW[$iI];
+      if($iX > $iR) {
+        return $iI;
+      }
+      $iI++;
+    }
+  }
+  
+  public static function fnMaxI($oM) 
+  {
+    // argmax of array w
+    $fMaxv = $oM->weights[0];
+    $iMaxix = 0;
+    for ($iI = 1; $iI < count($oM->weights); $iI++) {
+      $fV = $oM->weights[$iI];
+      if ($fV < $fMaxv) continue;
+
+      $iMaxix = $iI;
+      $fMaxv = $fV;
+    }
+    return $iMaxix;
+  }
 }

@@ -312,18 +312,143 @@ class RNN
       $iTarget = ($iInputIndex === $iMax - 1 ? 0 : $aInput[$iInputIndex + 1] + 1); // last step: end with END token
       $oOutput = $oEquation->fnRun($iSource);
       // set gradients into log probabilities
-      let logProbabilities = output; // interpret output as log probabilities
-      let probabilities = softmax(output); // compute the softmax probabilities
+      $oLogProbabilities = $oOutput; // interpret output as log probabilities
+      $oProbabilities = Matrix::fnSoftmax($oOutput); // compute the softmax probabilities
 
-      log2ppl += -Math.log2(probabilities.weights[target]); // accumulate base 2 log prob and do smoothing
-      cost += -Math.log(probabilities.weights[target]);
+      $iLog2ppl += -log2($oProbabilities->weights[$iTarget]); // accumulate base 2 log prob and do smoothing
+      $iCost += -log($oProbabilities->weights[$iTarget]);
       // write gradients into log probabilities
-      logProbabilities.deltas = probabilities.weights.slice(0);
-      logProbabilities.deltas[target] -= 1;
+      $oLogProbabilities->deltas = $oProbabilities->weights;
+      $oLogProbabilities->deltas[$iTarget] -= 1;
     }
 
-    $this->totalCost = cost;
-    return Math.pow(2, log2ppl / (max - 1));
+    $this->totalCost = $iCost;
+    return pow(2, $iLog2ppl / ($iMax - 1));
+  }
+
+  public function fnRunBackpropagate($aInput) 
+  {
+    $iI = count($aInput);
+    $aEquations = $this->model['equations'];
+    while ($iI > 0) {
+      $aEquations[$iI]->runBackpropagate($aInput[$iI - 1] + 1);
+      $iI--;
+    }
+    $aEquations[0]->runBackpropagate(0);
   }
   
+  public function fnStep($iLearningRate = null) 
+  {
+    // perform parameter update
+    //TODO: still not sure if this is ready for learningRate
+    $iStepSize = $this->learningRate;
+    $iRegc = $this->regc;
+    $iClipval = $this->clipval;
+    $iNumClipped = 0;
+    $iNumTot = 0;
+    $aAllMatrices = &$this->model['allMatrices'];
+    for ($iMatrixIndex = 0; $iMatrixIndex < count($aAllMatrices); $iMatrixIndex++) {
+      $oMatrix = &$aAllMatrices[$iMatrixIndex];
+      if (!(is_array($iMatrixIndex, $this->stepCache))) {
+        $this->stepCache[$iMatrixIndex] = Utilities::fnZeros($oMatrix->rows * $oMatrix->columns);
+      }
+      $aCache = $this->stepCache[$iMatrixIndex];
+      for ($iI = 0; $iI < count($oMatrix->weights); $iI++) {
+        $iR = $oMatrix->deltas[$iI];
+        $iW = $oMatrix->weights[$iI];
+        // rmsprop adaptive learning rate
+        $aCache[$iI] = $aCache[$iI] * $this->decayRate + (1 - $this->decayRate) * $iR * $iR;
+        // gradient clip
+        if ($iR > $iClipval) {
+          $iR = $iClipval;
+          $iNumClipped++;
+        }
+        if ($iR < -$iClipval) {
+          $iR = -$iClipval;
+          $iNumClipped++;
+        }
+        $iNumTot++;
+        // update (and regularize)
+        $oMatrix->weights[$iI] = $iW + -$iStepSize * $iR / sqrt($aCache[$iI] + $this->smoothEps) - $iRegc * $iW;
+      }
+    }
+    $this->ratioClipped = $iNumClipped / $iNumTot;
+  }
+  
+  public function fnIsRunnable()
+  {
+    if(count($this->model['equations']) === 0){
+      echo (`No equations bound, did you run train()?`);
+      return false;
+    }
+
+    return true;
+  }
+  
+  public function fnRun($aRawInput = [], $iMaxPredictionLength = 100, $bIsSampleI = false, $iTemperature = 1) 
+  {
+    if (!$this->fnIsRunnable()) 
+      return null;
+    $aInput = $this->fnFormatDataIn($aRawInput);
+    $aOutput = [];
+    $iI = 0;
+    while (count($this->model['equations']) < $iMaxPredictionLength) {
+      $this->fnBindEquation();
+    }
+    while (true) {
+      $iPreviousIndex = ($iI === 0
+        ? 0
+        : $iI < count($aInput)
+          ? $aInput[$iI - 1] + 1
+          : $aOutput[$iI - 1])
+          ;
+      $oEquation = $this->model['equations'][$iI];
+      // sample predicted letter
+      $oOutputMatrix = $oEquation->fnRun($iPreviousIndex);
+      $oLogProbabilities = new Matrix($this->model['output']->rows, $this->model['output']->columns);
+      Matrix::fnCopy($oLogProbabilities, $oOutputMatrix);
+      if ($iTemperature !== 1 && $bIsSampleI) {
+        /**
+         * scale log probabilities by temperature and re-normalize
+         * if temperature is high, logProbabilities will go towards zero
+         * and the softmax outputs will be more diffuse. if temperature is
+         * very low, the softmax outputs will be more peaky
+         */
+        for ($iJ = 0, $iMax = count($oLogProbabilities->weights); $iJ < $iMax; $iJ++) {
+          $oLogProbabilities->weights[$iJ] /= $iTemperature;
+        }
+      }
+
+      $oProbs = Matrix::fnSoftmax($oLogProbabilities);
+      $iNextIndex = ($bIsSampleI ? Matrix::fnSampleI($oProbs) : Matrix::fnMaxI($oProbs));
+
+      $iI++;
+      if ($iNextIndex === 0) {
+        // END token predicted, break out
+        break;
+      }
+      if ($iI >= $iMaxPredictionLength) {
+        // something is wrong
+        break;
+      }
+
+      array_push($aOutput, $iNextIndex);
+    }
+
+    /**
+     * we slice the input length here, not because output contains it, but it will be erroneous as we are sending the
+     * network what is contained in input, so the data is essentially guessed by the network what could be next, till it
+     * locks in on a value.
+     * Kind of like this, values are from input:
+     * 0 -> 4 (or in English: "beginning on input" -> "I have no idea? I'll guess what they want next!")
+     * 2 -> 2 (oh how interesting, I've narrowed down values...)
+     * 1 -> 9 (oh how interesting, I've now know what the values are...)
+     * then the output looks like: [4, 2, 9,...]
+     * so we then remove the erroneous data to get our true output
+     */
+    return $this->fnFormatDataOut(
+      $aInput,
+      array_map(function($v) { return $v - 1; }, array_slice($aOutput, 0, count($aInput)))
+    );
+  }
 }
