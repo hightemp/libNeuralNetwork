@@ -2,6 +2,9 @@
 
 namespace libNeuralNetwork;
 
+use libNeuralNetwork\Lookup;
+use libNeuralNetwork\Utilities;
+
 class NeuralNetwork 
 {
   protected $hiddenSizes;
@@ -15,6 +18,9 @@ class NeuralNetwork
   protected $changes;
   protected $errors;
   protected $errorCheckInterval;
+  protected $activation;
+  protected $binaryThresh;
+  protected $hiddenLayers;
   protected $activation;
 
   public static function fnTrainDefaults()
@@ -63,7 +69,11 @@ class NeuralNetwork
   
   function __construct($aOptions = []) 
   {
-    //Object.assign(this, self::fnDefaults(), $aOptions);
+    $aOptions = array_merge(self::fnDefaults(), $aOptions);
+    foreach ($aOptions as $sKey => $mValue) {
+      $this->$sKey = $mValue;
+    }
+    
     $this->hiddenSizes = $aOptions["hiddenLayers"];
     $this->trainOpts = [];
     $this->fnUpdateTrainingOptions(array_merge(self::fnTrainDefaults(), $aOptions));
@@ -105,19 +115,19 @@ class NeuralNetwork
 
     for ($iLayer = 0; $iLayer <= $this->outputLayer; $iLayer++) {
       $iSize = $this->sizes[$iLayer];
-      $this->deltas[$iLayer] = zeros($iSize);
-      $this->errors[$iLayer] = zeros($iSize);
-      $this->outputs[$iLayer] = zeros($iSize);
+      $this->deltas[$iLayer] = Utilities::fnZeros($iSize);
+      $this->errors[$iLayer] = Utilities::fnZeros($iSize);
+      $this->outputs[$iLayer] = Utilities::fnZeros($iSize);
 
       if ($iLayer > 0) {
-        $this->biases[$iLayer] = randos($iSize);
+        $this->biases[$iLayer] = Utilities::fnRandos($iSize);
         $this->weights[$iLayer] = array_fill(0, $iSize, 0);
         $this->changes[$iLayer] = array_fill(0, $iSize, 0);
 
         for ($iNode = 0; $iNode < $iSize; $iNode++) {
           $iPrevSize = $this->sizes[$iLayer - 1];
-          $this->weights[$iLayer][$iNode] = randos($iPrevSize);
-          $this->changes[$iLayer][$iNode] = zeros($iPrevSize);
+          $this->weights[$iLayer][$iNode] = Utilities::fnRandos($iPrevSize);
+          $this->changes[$iLayer][$iNode] = Utilities::fnZeros($iPrevSize);
         }
       }
     }
@@ -207,7 +217,7 @@ class NeuralNetwork
           $iSum += $aWeights[$iK] * $aInput[$iK];
         }
         //sigmoid
-        $this->outputs[$iLayer][$iNode] = 1 / (1 + Math.exp(-$iSum));
+        $this->outputs[$iLayer][$iNode] = 1 / (1 + exp(-$iSum));
       }
       $aOutput = $aInput = $this->outputs[$iLayer];
     }
@@ -276,7 +286,7 @@ class NeuralNetwork
           $iSum += $aWeights[$iK] * $aInput[$iK];
         }
         //tanh
-        $this->outputs[$iLayer][$iNode] = Math.tanh($iSum);
+        $this->outputs[$iLayer][$iNode] = tanh($iSum);
       }
       $aOutput = $aInput = $this->outputs[$iLayer];
     }
@@ -291,7 +301,7 @@ class NeuralNetwork
     $this->sizes = [];
     array_push($this->sizes, count($aData[0]['input']));
     if (!$this->hiddenSizes) {
-      array_push($this->sizes, Math.max(3, Math.floor(count($aData[0]['input']) / 2)));
+      array_push($this->sizes, max(3, floor(count($aData[0]['input']) / 2)));
     } else {
       foreach ($this->hiddenSizes as $iSize) {
         array_push($this->sizes, $iSize);
@@ -443,7 +453,7 @@ class NeuralNetwork
     $this->fnAdjustWeights();
 
     if ($blogErrorRate) {
-      return mse($this->errors[$this->outputLayer]);
+      return Utilities::fnMse($this->errors[$this->outputLayer]);
     } else {
       return null;
     }
@@ -593,5 +603,101 @@ class NeuralNetwork
     }
     
     return $aData;
+  }
+  
+  public function fnTest($aData) 
+  {
+    $aData = $this->fnFormatData($aData);
+
+    // for binary classification problems with one output node
+    $bIsBinary = count($aData[0]['output']) === 1;
+    $iFalsePos = 0;
+    $iFalseNeg = 0;
+    $iTruePos = 0;
+    $iTrueNeg = 0;
+
+    // for classification problems
+    $aMisclasses = [];
+
+    // run each pattern through the trained network and collect
+    // error and misclassification statistics
+    $iSum = 0;
+    for ($iI = 0; $iI < count($aData); $iI++) {
+      $aOutput = $this->fnRunInput($aData[0]['input']);
+      $aTarget = $aData[$iI]['output'];
+
+      $iActual = null;
+      $iExpected = null;
+      
+      if ($bIsBinary) {
+        $iActual = $aOutput[0] > $this->binaryThresh ? 1 : 0;
+        $iExpected = $aTarget[0];
+      }
+      else {
+        $iActual = array_search(Utilities::fnMax($aOutput), $aOutput);
+        $iExpected = array_search(Utilities::fnMax($aTarget), $aTarget);
+      }
+
+      if ($iActual !== $iExpected) {
+        $iMisclass = $aData[$iI];
+        $iMisclass = array_merge(
+          $iMisclass, 
+          [
+            'actual' => $iActual,
+            'expected' => $iExpected
+          ]
+        );
+        array_push($aMisclasses, $iMisclass);
+      }
+
+      if ($bIsBinary) {
+        if ($iActual === 0 && $iExpected === 0) {
+          $iTrueNeg++;
+        } else if ($iActual === 1 && $iExpected === 1) {
+          $iTruePos++;
+        } else if ($iActual === 0 && $iExpected === 1) {
+          $iFalseNeg++;
+        } else if ($iActual === 1 && $iExpected === 0) {
+          $iFalsePos++;
+        }
+      }
+
+      $aErrors = [];
+      foreach ($aOutput as $iKey => $iValue) {
+        $aErrors[] = $aTarget[$iKey] - $iValue;
+      }
+      $iSum += Utilities::fnMse($aErrors);
+    }
+    $fError = $iSum / count($aData);
+
+    $aStats = [
+      'error' => $fError,
+      'misclasses' => $aMisclasses
+    ];
+
+    if ($bIsBinary) {
+      $aStats = array_merge(
+        $aStats,
+        [
+          'trueNeg' => $iTrueNeg,
+          'truePos' => $iTruePos,
+          'falseNeg' => $iFalseNeg,
+          'falsePos' => $iFalsePos,
+          'total' => count($aData),
+          'precision' => $iTruePos / ($iTruePos + $iFalsePos),
+          'recall' => $iTruePos / ($iTruePos + $iFalseNeg),
+          'accuracy' => ($iTrueNeg + $iTruePos) / count($aData)
+        ]
+      );
+    }
+    return $aStats;
+  }
+  
+  public function fnCreateTrainStream($aOptions = []) 
+  {
+    $aOptions['neuralNetwork'] = &$this;
+    $this->setActivation();
+    //$this->trainStream = new TrainStream($aOptions);
+    return $this->trainStream;
   }
 }
