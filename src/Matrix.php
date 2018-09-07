@@ -108,4 +108,104 @@ class Matrix
     
     return $aDeltas;
   }
+  
+  public static function fnAdd(&$oProduct, $oLeft, $oRight) 
+  {
+    for($iI = 0; $iI < count($oLeft->weights); $iI++) {
+      $oProduct->weights[$iI] = $oLeft->weights[$iI] + $oRight->weights[$iI];
+      $oProduct->deltas[$iI] = 0;
+    }
+  }
+  
+  public static function fnAddB($oProduct, &$oLeft, &$oRight) 
+  {
+    for($iI = 0; $iI < count($oProduct->deltas); $iI++) {
+      $oLeft->deltas[$iI] = $oProduct->deltas[$iI];
+      $oRight->deltas[$iI] = $oProduct->deltas[$iI];
+    }
+  }
+  
+  public static function fnAllOnes(&$oProduct) 
+  {
+    for($iI = 0; $iI < count($oProduct->weights); $iI++) {
+      $oProduct->weights[$iI] = 1;
+      $oProduct->deltas[$iI] = 0;
+    }
+  }
+  
+  public static function fnCloneNegative(&$oProduct, $oLeft) 
+  {
+    $oProduct->rows = $oLeft->rows;
+    $oProduct->columns = $oLeft->columns;
+    $oProduct->weights = $oLeft->weights;
+    $oProduct->deltas = $oLeft->deltas;
+    for($iI = 0; $iI < count($oLeft->weights); $iI++) {
+      $oProduct->weights[$iI] = -$oLeft->weights[$iI];
+      $oProduct->deltas[$iI] = 0;
+    }
+  }
+  
+  public static function fnMultiply(&$oProduct, &$oLeft, &$oRight) 
+  {
+    $iLeftRows = $oLeft->rows;
+    $iLeftColumns = $oLeft->columns;
+    $iRightColumns = $oRight->columns;
+
+    // loop over rows of left
+    for($iLeftRow = 0; $iLeftRow < $iLeftRows; $iLeftRow++) {
+      $iLeftRowBase = $iLeftColumns * $iLeftRow;
+      $iRightRowBase = $iRightColumns * $iLeftRow;
+      // loop over cols of right
+      for($iRightColumn = 0; $iRightColumn < $iRightColumns; $iRightColumn++) {
+
+        // dot product loop
+        $iDot = 0;
+        //loop over columns of left
+        for($iLeftColumn = 0; $iLeftColumn < $iLeftColumns; $iLeftColumn++) {
+          $iRightColumnBase = $iRightColumns * $iLeftColumn;
+          $iLeftIndex = $iLeftRowBase + $iLeftColumn;
+          $iRightIndex = $iRightColumnBase + $iRightColumn;
+          $iDot +=
+              $oLeft->weights[$iLeftIndex]
+            * $oRight->weights[$iRightIndex];
+          $oLeft->deltas[$iLeftIndex] = 0;
+          $oRight->deltas[$iRightIndex] = 0;
+        }
+        $oProduct->weights[$iRightRowBase + $iLeftColumn] = $iDot;
+      }
+    }
+  }
+  
+  public static function fnMultiplyB(&$oProduct, &$oLeft, &$oRight) {
+    $iLeftRows = $oLeft->rows;
+    $iLeftColumns = $oLeft->columns;
+    $iRightColumns = $oRight->columns;
+
+    // loop over rows of left
+    for($iLeftRow = 0; $iLeftRow < $iLeftRows; $iLeftRow++) {
+      $iLeftRowBase = $iLeftColumns * $iLeftRow;
+      $iRightRowBase = $iRightColumns * $iLeftRow;
+      // loop over cols of right
+      for($iRightColumn = 0; $iRightColumn < $iRightColumns; $iRightColumn++) {
+
+        //loop over columns of left
+        for($iLeftColumn = 0; $iLeftColumn < $iLeftColumns; $iLeftColumn++) {
+          $iRightColumnBase = $iRightColumns * $iLeftColumn;
+          $iLeftRow = $iLeftRowBase + $iLeftColumn;
+          $iRightRow = $iRightColumnBase + $iRightColumn;
+          $fBackPropagateValue = $oProduct->deltas[$iRightRowBase + $iRightColumn];
+          $oLeft->deltas[$iLeftRow] += $oRight->weights[$iRightRow] * $fBackPropagateValue;
+          $oRight->deltas[$iRightRow] += $oLeft->weights[$iLeftRow] * $fBackPropagateValue;
+        }
+      }
+    }
+  }
+  
+  public static function fnMultiplyElement(&$oProduct, &$oLeft, &$oRight) 
+  {
+    for($iI = 0; $iI < count($oLeft->weights); $iI++) {
+      $oProduct->weights[$iI] = $oLeft->weights[$iI] * $oRight->weights[$iI];
+      $oProduct->deltas[$iI] = 0;
+    }
+  }
 }

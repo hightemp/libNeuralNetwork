@@ -3,6 +3,7 @@
 namespace libNeuralNetwork;
 
 use libNeuralNetwork\Matrix;
+use libNeuralNetwork\RandomMatrix;
 use libNeuralNetwork\DataFormatter;
 
 class RNN
@@ -171,16 +172,13 @@ class RNN
   
   public function fnCreateHiddenLayers() 
   {
-    $aHiddenSizes = $this->hiddenSizes;
-    $aModel = $this->model;
-    $aHiddenLayers = model['hiddenLayers'];
     //0 is end, so add 1 to offset
-    array_push($aHiddenLayers, $this->fnGetModel($aHiddenSizes[0], $this->inputSize));
-    $iPrevSize = $aHiddenSizes[0];
+    array_push($this->model['hiddenLayers'], $this->fnGetModel($this->hiddenSizes[0], $this->inputSize));
+    $iPrevSize = $this->hiddenSizes[0];
 
-    for ($iD = 1; $iD < count($aHiddenSizes); $iD++) { // loop over depths
-      $iHiddenSize = $aHiddenSizes[d];
-      array_push($aHiddenLayers, $this->fnGetModel($iHiddenSize, $iPrevSize));
+    for ($iD = 1; $iD < count($this->hiddenSizes); $iD++) { // loop over depths
+      $iHiddenSize = $this->hiddenSizes[d];
+      array_push($this->model['hiddenLayers'], $this->fnGetModel($iHiddenSize, $iPrevSize));
       $iPrevSize = $iHiddenSize;
     }
   }
@@ -221,4 +219,111 @@ class RNN
     //0 is end, so add 1 to offset
     $this->model['input'] = new RandomMatrix($this->inputRange + 1, $this->inputSize, 0.08);
   }
+  
+  public function fnCreateOutputMatrix() 
+  {
+    //0 is end, so add 1 to offset
+    //whd
+    $this->model['outputConnector'] = new RandomMatrix(
+      $this->outputSize + 1, 
+      $this->hiddenSizes[$this->hiddenSizes.length - 1], 
+      0.08
+    );
+    //0 is end, so add 1 to offset
+    //bd
+    $this->model['output'] = new Matrix($this->outputSize + 1, 1);
+  }
+  
+  public function fnBindEquation() 
+  {
+    $oEquation = new Equation();
+    $aOutputs = [];
+    $aEquationConnection = count($this->model['equationConnections']) > 0
+      ? $this->model['equationConnections'][count($this->model['equationConnections']) - 1]
+      : $this->initialLayerInputs
+      ;
+
+    // 0 index
+    $oOutput = $this->fnGetEquation(
+      $oEquation, 
+      $oEquation->fnInputMatrixToRow($this->model['input']),
+      $aEquationConnection[0],
+      $this->model['hiddenLayers'][0]
+    );
+    array_push($aOutputs, $oOutput);
+    // 1+ indices
+    for ($iI = 1, $iMax = count($this->hiddenSizes); $iI < $iMax; $iI++) {
+      $oOutput = $this->fnGetEquation($oEquation, $oOutput, $aEquationConnection[i], $this->model['hiddenLayers'][$iI]);
+      array_push($aOutputs, $oOutput);
+    }
+
+    array_push($this->model['equationConnections'], $aOutputs);
+    $oEquation->fnAdd($oEquation->fnMultiply($this->model['outputConnector'], $oOutput), $this->model['output']);
+    array_push($this->model['equations'], $oEquation);
+  }
+  
+  public function fnMapModel() 
+  {
+    $this->fnCreateInputMatrix();
+    if (!$this->model['input']) throw new Exception('net.model.input not set');
+    array_push($this->model['allMatrices'], $this->model['input']);
+
+    $this->fnCreateHiddenLayers();
+    if (!count($this->model['hiddenLayers'])) throw new Exception('net.hiddenLayers not set');
+    for ($iI = 0, $iMax = count($this->model['hiddenLayers']); $iI < $iMax; $iI++) {
+      foreach ($this->model['hiddenLayers'][$iI] as $mProperty) {
+        array_push($this->model['allMatrices'], $mProperty);
+      }
+    }
+
+    $this->fnCreateOutputMatrix();
+    if (!$this->model['outputConnector']) throw new Exception('net.model.outputConnector not set');
+    if (!$this->model['output']) throw new Exception('net.model.output not set');
+
+    array_push($this->model['allMatrices'], $this->model['outputConnector']);
+    array_push($this->model['allMatrices'], $this->model['output']);
+  }
+
+  public function fnTrainPattern($aInput, $iLearningRate = null) 
+  {
+    $iError = $this->fnRunInput($aInput);
+    $this->fnRunBackpropagate($aInput);
+    $this->fnStep($iLearningRate);
+    return $iError;
+  }
+
+  public function fnRunInput($aInput) 
+  {
+    $this->runs++;
+    $iMax = count($aInput);
+    $iLog2ppl = 0;
+    $iCost = 0;
+    $oEquation;
+    
+    while (count($this->model['equations']) <= count($aInput) + 1) {//last is zero
+      $this->fnBindEquation();
+    }
+    for ($iInputIndex = -1, $iInputMax = count($aInput); $iInputIndex < $iInputMax; $iInputIndex++) {
+      // start and end tokens are zeros
+      $iEquationIndex = $iInputIndex + 1;
+      $oEquation = $this->model['equations'][$iEquationIndex];
+
+      $iSource = ($iInputIndex === -1 ? 0 : $aInput[$iInputIndex] + 1); // first step: start with START token
+      $iTarget = ($iInputIndex === $iMax - 1 ? 0 : $aInput[$iInputIndex + 1] + 1); // last step: end with END token
+      $oOutput = $oEquation->fnRun($iSource);
+      // set gradients into log probabilities
+      let logProbabilities = output; // interpret output as log probabilities
+      let probabilities = softmax(output); // compute the softmax probabilities
+
+      log2ppl += -Math.log2(probabilities.weights[target]); // accumulate base 2 log prob and do smoothing
+      cost += -Math.log(probabilities.weights[target]);
+      // write gradients into log probabilities
+      logProbabilities.deltas = probabilities.weights.slice(0);
+      logProbabilities.deltas[target] -= 1;
+    }
+
+    $this->totalCost = cost;
+    return Math.pow(2, log2ppl / (max - 1));
+  }
+  
 }

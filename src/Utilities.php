@@ -57,7 +57,7 @@ class Utilities
     return $aResult;
   }
   
-  public static function likely($aInput, $oNet) 
+  public static function fnLikely($aInput, $oNet) 
   {
     $aOutput = $oNet->run($aInput);
     $iMaxProp = null;
@@ -70,5 +70,41 @@ class Utilities
       }
     }
     return $iMaxProp;
+  }
+  
+  public static function fnRandomF($iA, $iB) 
+  {
+    return (rand(0, 100000) / 100000) * ($iB - $iA) + $iA;
+  }
+
+  public static function fnRandomI($iA, $iB)
+  {
+    return rand($iA, $iB);
+  }
+
+  public static function fnRandomN($iMu, $iStd) 
+  {
+    return $iMu + self::fnGaussRandom() * $iStd;
+  }
+
+  protected static $bReturnV = false;
+  protected static $iVVal = 0;
+
+  function fnGaussRandom() {
+    if (self::$bReturnV) {
+      self::$bReturnV = false;
+      return self::$iVVal;
+    }
+    $fU = 2 * rand(0, 100000) / 100000 - 1;
+    $fV = 2 * rand(0, 100000) / 100000 - 1;
+    $fR = $fU * $fU + $fV * $fV;
+    if ($fR == 0 || $fR > 1) {
+      return self::fnGaussRandom();
+    }
+    $fC = sqrt(-2 * log($fR) / $fR);
+    self::$iVVal = $fV * $fC; // cache this
+    self::$bReturnV = true;
+    
+    return $fU * $fC;
   }
 }
