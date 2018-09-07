@@ -208,4 +208,81 @@ class Matrix
       $oProduct->deltas[$iI] = 0;
     }
   }
+  
+  public static function fnMultiplyElementB(&$oProduct, &$oLeft, &$oRight) 
+  {
+    for($iI = 0; $iI < count($oLeft->weights); $iI++) {
+      $oLeft->deltas[$iI] = $oRight->weights[$iI] * $oProduct->deltas[$iI];
+      $oRight->deltas[$iI] = $oLeft->weights[$iI] * $oProduct->deltas[$iI];
+    }
+  }
+  
+  public static function fnRelu(&$oProduct, &$oLeft) 
+  {
+    for($iI = 0; $iI < count($oLeft->weights); $iI++) {
+      $oProduct->weights[$iI] = max(0, $oLeft->weights[$iI]); // relu
+      $oProduct->deltas[$iI] = 0;
+    }
+  }
+  
+  public static function fnReluB(&$oProduct, &$oLeft) 
+  {
+    for ($iI = 0; $iI < count($oProduct->deltas); $iI++) {
+      $oLeft->deltas[$iI] = $oLeft->weights[$iI] > 0 ? $oProduct->deltas[$iI] : 0;
+    }
+  }
+  
+  public static function fnRowPluck(&$oProduct, &$oLeft, $iRowPluckIndex) 
+  {
+    $iColumns = $oLeft->columns;
+    $iRowBase = $iColumns * $iRowPluckIndex;
+    for ($iColumn = 0; $iColumn < $iColumns; $iColumn++) {
+      $oProduct->weights[$iColumn] = $oLeft->weights[$iRowBase + $iColumn];
+      $oProduct->deltas[$iColumn] = 0;
+    }
+  }
+  
+  public static function fnRowPluckB(&$oProduct, &$oLeft, $iRowIndex) 
+  {
+    $iColumns = $oLeft->columns;
+    $iRowBase = $iColumns * $iRowIndex;
+    for ($iColumn = 0; $iColumn < $iColumns; $iColumn++) {
+      $oLeft->deltas[$iRowBase + $iColumn] = $oProduct->deltas[$iColumn];
+    }
+  }
+  
+  public static function fnSigmoid(&$oProduct, &$oLeft) 
+  {
+    // sigmoid nonlinearity
+    for ($iI = 0; $iI < count($oLeft->weights); $iI++) {
+      $oProduct->weights[$iI] = 1 / ( 1 + exp(-$oLeft->weights[$iI]));
+      $oProduct->deltas[$iI] = 0;
+    }
+  }
+
+  public static function fnSigmoidB(&$oProduct, &$oLeft)
+  {
+    for ($iI = 0; $iI < count($oProduct->deltas); $iI++) {
+      $fMWI = $oProduct->weights[$iI];
+      $oLeft->deltas[$iI] = $fMWI * (1 - $fMWI) * $oProduct->deltas[$iI];
+    }
+  }
+  
+  public static function fnTanh(&$oProduct, &$oLeft) 
+  {
+    // tanh nonlinearity
+    for ($iI = 0; $iI < count($oLeft->weights); $iI++) {
+      $oProduct->weights[$iI] = tanh($oLeft->weights[$iI]);
+      $oProduct->deltas[$iI] = 0;
+    }
+  }
+  
+  public static function fnTanhB(&$oProduct, &$oLeft) 
+  {
+    for ($iI = 0; $iI < count($oProduct->deltas); $iI++) {
+      // grad for z = tanh(x) is (1 - z^2)
+      $fMWI = $oProduct->weights[$iI];
+      $oLeft->deltas[$iI] = (1 - $fMWI * $fMWI) * $oProduct->deltas[$iI];
+    }
+  }
 }

@@ -95,8 +95,8 @@ class Equation
       'left' => $oLeft,
       'right' => $oRight,
       'product' => $oProduct,
-      //'forwardFn' => multiplyElement,
-      //'backpropagationFn' => multiplyElementB
+      'forwardFn' => 'Matrix::fnMultiplyElement',
+      'backpropagationFn' => 'Matrix::fnMultiplyElementB'
     ]);
     return $oProduct;
   }
@@ -107,8 +107,8 @@ class Equation
     array_push($this->states, [
       'left' => $oM,
       'product' => $oProduct,
-      //'forwardFn' => relu,
-      //'backpropagationFn' => reluB
+      'forwardFn' => 'Matrix::fnRelu',
+      'backpropagationFn' => 'Matrix::fnReluB'
     ]);
     return $oProduct;
   }
@@ -135,8 +135,8 @@ class Equation
         return $oSelf->inputRow;
       },
       'product' => $oProduct,
-      //'forwardFn' => rowPluck,
-      //'backpropagationFn' => rowPluckB
+      'forwardFn' => 'Matrix::rowPluck',
+      'backpropagationFn' => 'Matrix::rowPluckB'
     ]);
     return product;
   }

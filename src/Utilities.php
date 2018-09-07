@@ -90,7 +90,8 @@ class Utilities
   protected static $bReturnV = false;
   protected static $iVVal = 0;
 
-  function fnGaussRandom() {
+  function fnGaussRandom() 
+  {
     if (self::$bReturnV) {
       self::$bReturnV = false;
       return self::$iVVal;
@@ -106,5 +107,11 @@ class Utilities
     self::$bReturnV = true;
     
     return $fU * $fC;
+  }
+  
+  public static function fnSig($fX) 
+  {
+    // helper function for computing sigmoid
+    return 1 / (1 + exp(-$fX));
   }
 }
