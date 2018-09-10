@@ -9,6 +9,7 @@ use Closure;
 
 class NeuralNetwork 
 {
+  public $outputLookup;
   public $hiddenSizes;
   public $trainOpts;
   public $sizes;
@@ -518,26 +519,6 @@ class NeuralNetwork
     while ($this->fnTrainingTick($aData, $aStatus, $iEndTime));
     return $aStatus;
   }
-  
-  /*
-  trainAsync(data, options = {}) {
-    let status, endTime;
-    ({ data, status, endTime } = $this->_prepTraining(data, options));
-
-    return new Promise((resolve, reject) => {
-      try {
-        const thawedTrain = new Thaw(new Array($this->trainOpts.iterations), {
-          delay: true,
-          each: () => $this->_trainingTick(data, status, endTime) || thawedTrain.stop(),
-          done: () => resolve(status)
-        });
-        thawedTrain.tick();
-      } catch (trainError) {
-        reject({trainError, status});
-      }
-    });
-  }
-   */
   
   public function fnTrainPattern($aInput, $aTarget, $blogErrorRate) 
   {
