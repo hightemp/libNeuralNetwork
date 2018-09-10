@@ -59,7 +59,7 @@ class Utilities
   
   public static function fnLikely($aInput, $oNet) 
   {
-    $aOutput = $oNet->run($aInput);
+    $aOutput = $oNet->fnRun($aInput);
     $iMaxProp = null;
     $iMaxValue = -1;
     foreach ($aOutput as $iProp) {

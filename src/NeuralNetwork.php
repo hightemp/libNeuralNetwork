@@ -4,6 +4,8 @@ namespace libNeuralNetwork;
 
 use libNeuralNetwork\Lookup;
 use libNeuralNetwork\Utilities;
+use Exception;
+use Closure;
 
 class NeuralNetwork 
 {
@@ -18,10 +20,20 @@ class NeuralNetwork
   public $changes;
   public $errors;
   public $errorCheckInterval;
+  public $fnRunInput;
+  public $fnCalculateDeltas;
   public $activation;
   public $binaryThresh;
   public $hiddenLayers;
-
+  public $fnRunInputSigmoid;
+  public $fnRunInputRelu;
+  public $fnRunInputLeakyRelu;
+  public $fnRunInputTanh;
+  public $fnCalculateDeltasSigmoid;
+  public $fnCalculateDeltasRelu;
+  public $fnCalculateLeakyRelu;
+  public $fnCalculateTanh;
+          
   public static function fnTrainDefaults()
   {
     return [
@@ -33,7 +45,7 @@ class NeuralNetwork
       "momentum" => 0.1,        // multiply's against the specified "change" then adds to learning rate for change
       "callback" => null,       // a periodic call back that can be triggered while training
       "callbackPeriod" => 10,   // the number of iterations through the training data between callback calls
-      "timeout" => -1           // the max number of milliseconds to train for
+      "timeout" => INF          // the max number of milliseconds to train for
     ];
   }
   
@@ -74,7 +86,7 @@ class NeuralNetwork
     }
     
     $this->hiddenSizes = $aOptions["hiddenLayers"];
-    $this->trainOpts = [];
+    $this->trainOpts = self::fnTrainDefaults();
     $this->fnUpdateTrainingOptions(array_merge(self::fnTrainDefaults(), $aOptions));
 
     $this->sizes = null;
@@ -90,11 +102,187 @@ class NeuralNetwork
     $this->errorCheckInterval = 1;
     
     //if (!$this->constructor.prototype.hasOwnProperty('runInput')) {
-      $this->runInput = null;
+      $this->fnRunInput = null;
     //}
     //if (!$this->constructor.prototype.hasOwnProperty('calculateDeltas')) {
-      $this->calculateDeltas = null;
+      $this->fnCalculateDeltas = null;
     //}
+      
+    $this->fnRunInputSigmoid = function($aInput) 
+    {
+      $this->outputs[0] = $aInput;  // set output state of input layer
+
+      $aOutput = null;
+
+      for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+        for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+          $aWeights = $this->weights[$iLayer][$iNode];
+
+          $iSum = $this->biases[$iLayer][$iNode];
+          for ($iK = 0; $iK < count($aWeights); $iK++) {
+            $iSum += $aWeights[$iK] * $aInput[$iK];
+          }
+          //sigmoid
+          $this->outputs[$iLayer][$iNode] = 1 / (1 + exp(-$iSum));
+        }
+        $aOutput = $aInput = $this->outputs[$iLayer];
+      }
+
+      return $aOutput;
+    };
+  
+    $this->fnRunInputRelu = function($aInput) 
+    {
+      $this->outputs[0] = $aInput;  // set output state of input layer
+
+      $aOutput = null;
+
+      for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+        for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+          $aWeights = $this->weights[$iLayer][$iNode];
+
+          $iSum = $this->biases[$iLayer][$iNode];
+          for ($iK = 0; $iK < count($aWeights); $iK++) {
+            $iSum += $aWeights[$iK] * $aInput[$iK];
+          }
+          //relu
+          $this->outputs[$iLayer][$iNode] = ($iSum < 0 ? 0 : $iSum);
+        }
+        $aOutput = $aInput = $this->outputs[$iLayer];
+      }
+
+      return $aOutput;
+    };
+  
+    $this->fnRunInputLeakyRelu = function($aInput) 
+    {
+      $this->outputs[0] = $aInput;  // set output state of input layer
+
+      $aOutput = null;
+
+      for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+        for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+          $aWeights = $this->weights[$iLayer][$iNode];
+
+          $iSum = $this->biases[$iLayer][$iNode];
+          for ($iK = 0; $iK < count($aWeights); $iK++) {
+            $iSum += $aWeights[$iK] * $aInput[$iK];
+          }
+          //relu
+          $this->outputs[$iLayer][$iNode] = ($iSum < 0 ? 0 : 0.01 * $iSum);
+        }
+        $aOutput = $aInput = $this->outputs[$iLayer];
+      }
+
+      return $aOutput;
+    };
+  
+    $this->fnRunInputTanh = function($aInput) 
+    {
+      $this->outputs[0] = $aInput;  // set output state of input layer
+
+      $aOutput = null;
+
+      for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
+        for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+          $aWeights = $this->weights[$iLayer][$iNode];
+
+          $iSum = $this->biases[$iLayer][$iNode];
+          for ($iK = 0; $iK < count($aWeights); $iK++) {
+            $iSum += $aWeights[$iK] * $aInput[$iK];
+          }
+          //tanh
+          $this->outputs[$iLayer][$iNode] = tanh($iSum);
+        }
+        $aOutput = $aInput = $this->outputs[$iLayer];
+      }
+
+      return $aOutput;
+    };
+    
+    $this->fnCalculateDeltasSigmoid = function($aTarget) 
+    {
+      for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
+        for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+          $iOutput = $this->outputs[$iLayer][$iNode];
+
+          $iError = 0;
+          if ($iLayer === $this->outputLayer) {
+            $iError = $aTarget[$iNode] - $iOutput;
+          } else {
+            $aDeltas = $this->deltas[$iLayer + 1];
+            for ($iK = 0; $iK < count($aDeltas); $iK++) {
+              $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
+            }
+          }
+          $this->errors[$iLayer][$iNode] = $iError;
+          $this->deltas[$iLayer][$iNode] = $iError * $iOutput * (1 - $iOutput);
+        }
+      }
+    };
+
+    $this->fnCalculateDeltasRelu = function($aTarget) 
+    {
+      for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
+        for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+          $iOutput = $this->outputs[$iLayer][$iNode];
+
+          $iError = 0;
+          if ($iLayer === $this->outputLayer) {
+            $iError = $aTarget[$iNode] - $iOutput;
+          } else {
+            $aDeltas = $this->deltas[$iLayer + 1];
+            for ($iK = 0; $iK < count($aDeltas); $iK++) {
+              $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
+            }
+          }
+          $this->errors[$iLayer][$iNode] = $iError;
+          $this->deltas[$iLayer][$iNode] = $iOutput > 0 ? $iError : 0;
+        }
+      }
+    };
+
+    $this->fnCalculateDeltasLeakyRelu = function($aTarget) 
+    {
+      for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
+        for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+          $iOutput = $this->outputs[$iLayer][$iNode];
+
+          $iError = 0;
+          if ($iLayer === $this->outputLayer) {
+            $iError = $aTarget[$iNode] - $iOutput;
+          } else {
+            $aDeltas = $this->deltas[$iLayer + 1];
+            for ($iK = 0; $iK < count($aDeltas); $iK++) {
+              $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
+            }
+          }
+          $this->errors[$iLayer][$iNode] = $iError;
+          $this->deltas[$iLayer][$iNode] = $iOutput > 0 ? $iError : 0.01 * $iError;
+        }
+      }
+    };
+
+    $this->fnCalculateDeltasTanh = function($aTarget) 
+    {
+      for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
+        for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
+          $iOutput = $this->outputs[$iLayer][$iNode];
+
+          $iError = 0;
+          if ($iLayer === $this->outputLayer) {
+            $iError = $aTarget[$iNode] - $iOutput;
+          } else {
+            $aDeltas = $this->deltas[$iLayer + 1];
+            for ($iK = 0; $iK < count($aDeltas); $iK++) {
+              $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
+            }
+          }
+          $this->errors[$iLayer][$iNode] = $iError;
+          $this->deltas[$iLayer][$iNode] = (1 - $iOutput * $iOutput) * $iError;
+        }
+      }
+    };
   }
   
   public function fnInitialize() 
@@ -102,7 +290,7 @@ class NeuralNetwork
     if (!$this->sizes) 
       throw new Exception('Sizes must be set before initializing');
 
-    $this->outputLayer = $this->sizes.length - 1;
+    $this->outputLayer = count($this->sizes) - 1;
     $this->biases = []; // weights for bias nodes
     $this->weights = [];
     $this->outputs = [];
@@ -139,20 +327,20 @@ class NeuralNetwork
     $this->activation = ($sActivation) ? $sActivation : $this->activation;
     switch ($this->activation) {
       case 'sigmoid':
-        $this->runInput = $this->runInput || $this->_runInputSigmoid;
-        $this->calculateDeltas = $this->calculateDeltas || $this->_calculateDeltasSigmoid;
+        $this->fnRunInput = !empty($this->fnRunInput) ? $this->fnRunInput : $this->fnRunInputSigmoid;
+        $this->fnCalculateDeltas = !empty($this->fnCalculateDeltas) ? $this->fnCalculateDeltas : $this->fnCalculateDeltasSigmoid;
         break;
       case 'relu':
-        $this->runInput = $this->runInput || $this->_runInputRelu;
-        $this->calculateDeltas = $this->calculateDeltas || $this->_calculateDeltasRelu;
+        $this->fnRunInput = !empty($this->fnRunInput) ? $this->fnRunInput : $this->fnRunInputRelu;
+        $this->fnCalculateDeltas = !empty($this->fnCalculateDeltas) ? $this->fnCalculateDeltas : $this->fnCalculateDeltasRelu;
         break;
       case 'leaky-relu':
-        $this->runInput = $this->runInput || $this->_runInputLeakyRelu;
-        $this->calculateDeltas = $this->calculateDeltas || $this->_calculateDeltasLeakyRelu;
+        $this->fnRunInput = !empty($this->fnRunInput) ? $this->fnRunInput : $this->fnRunInputLeakyRelu;
+        $this->fnCalculateDeltas = !empty($this->fnCalculateDeltas) ? $this->fnCalculateDeltas : $this->fnCalculateDeltasLeakyRelu;
         break;
       case 'tanh':
-        $this->runInput = $this->runInput || $this->_runInputTanh;
-        $this->calculateDeltas = $this->calculateDeltas || $this->_calculateDeltasTanh;
+        $this->fnRunInput = !empty($this->fnRunInput) ? $this->fnRunInput : $this->fnRunInputTanh;
+        $this->fnCalculateDeltas = !empty($this->fnCalculateDeltas) ? $this->fnCalculateDeltas : $this->fnCalculateDeltasTanh;
         break;
       default:
         throw new Exception('unknown activation '.$this->activation.', The activation should be one of [\'sigmoid\', \'relu\', \'leaky-relu\', \'tanh\']');
@@ -161,7 +349,7 @@ class NeuralNetwork
   
   public function fnIsRunnable()
   {
-    if(!$this->runInput){
+    if(!$this->fnRunInput){
       echo ('Activation function has not been initialized, did you run train()?');
       return false;
     }
@@ -193,106 +381,15 @@ class NeuralNetwork
       $aInput = Lookup::fnToArray($this->inputLookup, $aInput);
     }
 
-    $aOutput = $this->runInput($aInput);
+    $fnRunInput = Closure::bind($this->fnRunInput, $this);
+    $aOutput = $fnRunInput($aInput);
 
     if ($this->outputLookup) {
       $aOutput = Lookup::fnToHash($this->outputLookup, $aOutput);
     }
     return $aOutput;
   }
-  
-  public function fnRunInputSigmoid($aInput) 
-  {
-    $this->outputs[0] = $aInput;  // set output state of input layer
-
-    $aOutput = null;
     
-    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
-      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
-        $aWeights = $this->weights[$iLayer][$iNode];
-
-        $iSum = $this->biases[$iLayer][$iNode];
-        for ($iK = 0; $iK < count($aWeights); $iK++) {
-          $iSum += $aWeights[$iK] * $aInput[$iK];
-        }
-        //sigmoid
-        $this->outputs[$iLayer][$iNode] = 1 / (1 + exp(-$iSum));
-      }
-      $aOutput = $aInput = $this->outputs[$iLayer];
-    }
-    
-    return $aOutput;
-  }
-  
-  public function fnRunInputRelu($aInput) 
-  {
-    $this->outputs[0] = $aInput;  // set output state of input layer
-
-    $aOutput = null;
-    
-    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
-      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
-        $aWeights = $this->weights[$iLayer][$iNode];
-
-        $iSum = $this->biases[$iLayer][$iNode];
-        for ($iK = 0; $iK < count($aWeights); $iK++) {
-          $iSum += $aWeights[$iK] * $aInput[$iK];
-        }
-        //relu
-        $this->outputs[$iLayer][$iNode] = ($iSum < 0 ? 0 : $iSum);
-      }
-      $aOutput = $aInput = $this->outputs[$iLayer];
-    }
-    
-    return $aOutput;
-  }
-  
-  public function fnRunInputLeakyRelu($aInput) 
-  {
-    $this->outputs[0] = $aInput;  // set output state of input layer
-
-    $aOutput = null;
-    
-    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
-      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
-        $aWeights = $this->weights[$iLayer][$iNode];
-
-        $iSum = $this->biases[$iLayer][$iNode];
-        for ($iK = 0; $iK < count($aWeights); $iK++) {
-          $iSum += $aWeights[$iK] * $aInput[$iK];
-        }
-        //relu
-        $this->outputs[$iLayer][$iNode] = ($iSum < 0 ? 0 : 0.01 * $iSum);
-      }
-      $aOutput = $aInput = $this->outputs[$iLayer];
-    }
-    
-    return $aOutput;
-  }
-  
-  public function fnRunInputTanh($aInput) 
-  {
-    $this->outputs[0] = $aInput;  // set output state of input layer
-
-    $aOutput = null;
-    
-    for ($iLayer = 1; $iLayer <= $this->outputLayer; $iLayer++) {
-      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
-        $aWeights = $this->weights[$iLayer][$iNode];
-
-        $iSum = $this->biases[$iLayer][$iNode];
-        for ($iK = 0; $iK < count($aWeights); $iK++) {
-          $iSum += $aWeights[$iK] * $aInput[$iK];
-        }
-        //tanh
-        $this->outputs[$iLayer][$iNode] = tanh($iSum);
-      }
-      $aOutput = $aInput = $this->outputs[$iLayer];
-    }
-    
-    return $aOutput;
-  }
-  
   public function fnVerifyIsInitialized($aData) 
   {
     if ($this->sizes) return;
@@ -319,8 +416,8 @@ class NeuralNetwork
     
     self::fnValidateTrainingOptions($this->trainOpts);
     
-    $this->fnSetLogMethod($aOptions['log'] || $this->trainOpts['log']);
-    $this->activation = $aOptions['activation'] || $this->activation;
+    $this->fnSetLogMethod(isset($aOptions['log']) ? $aOptions['log'] : $this->trainOpts['log']);
+    $this->activation = isset($aOptions['activation']) ? $aOptions['activation'] : $this->activation;
   }
   
   public function getTrainOptsJSON()
@@ -369,17 +466,17 @@ class NeuralNetwork
     }
   }
   
-  public function fnTrainingTick($aData, $aStatus, $iEndTime) 
+  public function fnTrainingTick($aData, &$aStatus, $iEndTime) 
   {
     if ($aStatus['iterations'] >= $this->trainOpts['iterations'] || $aStatus['error'] <= $this->trainOpts['errorThresh'] || time() >= $iEndTime) {
       return false;
     }
 
     $aStatus['iterations']++;
-
+    
     if ($this->trainOpts['log'] && ($aStatus['iterations'] % $this->trainOpts['logPeriod'] === 0)) {
       $aStatus['error'] = $this->fnCalculateTrainingError($aData);
-      $this->trainOpts.log("iterations: {$aStatus['iterations']}, training error: {$aStatus['error']}");
+      $this->trainOpts['log']("iterations: {$aStatus['iterations']}, training error: {$aStatus['error']}");
     } else {
       if ($aStatus['iterations'] % $this->errorCheckInterval === 0) {
         $aStatus['error'] = $this->fnCalculateTrainingError($aData);
@@ -419,7 +516,7 @@ class NeuralNetwork
     extract($this->fnPrepTraining($aData, $aOptions));
 
     while ($this->fnTrainingTick($aData, $aStatus, $iEndTime));
-    return status;
+    return $aStatus;
   }
   
   /*
@@ -445,100 +542,18 @@ class NeuralNetwork
   public function fnTrainPattern($aInput, $aTarget, $blogErrorRate) 
   {
     // forward propagate
-    $this->fnRunInput($aInput);
+    $fnRunInput = Closure::bind($this->fnRunInput, $this);
+    $fnRunInput($aInput);
 
     // back propagate
-    $this->fnCalculateDeltas($aTarget);
+    $fnCalculateDeltas = Closure::bind($this->fnCalculateDeltas, $this);
+    $fnCalculateDeltas($aTarget);
     $this->fnAdjustWeights();
 
     if ($blogErrorRate) {
       return Utilities::fnMse($this->errors[$this->outputLayer]);
     } else {
       return null;
-    }
-  }
-  
-  public function fnCalculateDeltasSigmoid($aTarget) 
-  {
-    for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
-      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
-        $iOutput = $this->outputs[$iLayer][$iNode];
-
-        $iError = 0;
-        if ($iLayer === $this->outputLayer) {
-          $iError = $aTarget[$iNode] - $iOutput;
-        } else {
-          $aDeltas = $this->deltas[$iLayer + 1];
-          for ($iK = 0; $iK < count($aDeltas); $iK++) {
-            $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
-          }
-        }
-        $this->errors[$iLayer][$iNode] = $iError;
-        $this->deltas[$iLayer][$iNode] = $iError * $iOutput * (1 - $iOutput);
-      }
-    }
-  }
-  
-  public function fnCalculateDeltasRelu($aTarget) 
-  {
-    for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
-      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
-        $iOutput = $this->outputs[$iLayer][$iNode];
-
-        $iError = 0;
-        if ($iLayer === $this->outputLayer) {
-          $iError = $aTarget[$iNode] - $iOutput;
-        } else {
-          $aDeltas = $this->deltas[$iLayer + 1];
-          for ($iK = 0; $iK < count($aDeltas); $iK++) {
-            $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
-          }
-        }
-        $this->errors[$iLayer][$iNode] = $iError;
-        $this->deltas[$iLayer][$iNode] = $iOutput > 0 ? $iError : 0;
-      }
-    }
-  }
-  
-  public function fnCalculateDeltasLeakyRelu($aTarget) 
-  {
-    for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
-      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
-        $iOutput = $this->outputs[$iLayer][$iNode];
-
-        $iError = 0;
-        if ($iLayer === $this->outputLayer) {
-          $iError = $aTarget[$iNode] - $iOutput;
-        } else {
-          $aDeltas = $this->deltas[$iLayer + 1];
-          for ($iK = 0; $iK < count($aDeltas); $iK++) {
-            $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
-          }
-        }
-        $this->errors[$iLayer][$iNode] = $iError;
-        $this->deltas[$iLayer][$iNode] = $iOutput > 0 ? $iError : 0.01 * $iError;
-      }
-    }
-  }
-
-  public function fnCalculateDeltasTanh($aTarget) 
-  {
-    for ($iLayer = $this->outputLayer; $iLayer >= 0; $iLayer--) {
-      for ($iNode = 0; $iNode < $this->sizes[$iLayer]; $iNode++) {
-        $iOutput = $this->outputs[$iLayer][$iNode];
-
-        $iError = 0;
-        if ($iLayer === $this->outputLayer) {
-          $iError = $aTarget[$iNode] - $iOutput;
-        } else {
-          $aDeltas = $this->deltas[$iLayer + 1];
-          for ($iK = 0; $iK < count($aDeltas); $iK++) {
-            $iError += $aDeltas[$iK] * $this->weights[$iLayer + 1][$iK][$iNode];
-          }
-        }
-        $this->errors[$iLayer][$iNode] = $iError;
-        $this->deltas[$iLayer][$iNode] = (1 - $iOutput * $iOutput) * $iError;
-      }
     }
   }
   
@@ -559,7 +574,7 @@ class NeuralNetwork
           $this->changes[$iLayer][$iNode][$iK] = $iChange;
           $this->weights[$iLayer][$iNode][$iK] += $iChange;
         }
-        $this->biases[$iLayer][$iNode] += $this->trainOpts['learningRate'] * delta;
+        $this->biases[$iLayer][$iNode] += $this->trainOpts['learningRate'] * $iDelta;
       }
     }
   }
@@ -622,7 +637,8 @@ class NeuralNetwork
     // error and misclassification statistics
     $iSum = 0;
     for ($iI = 0; $iI < count($aData); $iI++) {
-      $aOutput = $this->fnRunInput($aData[0]['input']);
+      $fnRunInput = Closure::bind($this->fnRunInput, $this);
+      $aOutput = $fnRunInput($aData[0]['input']);
       $aTarget = $aData[$iI]['output'];
 
       $iActual = null;

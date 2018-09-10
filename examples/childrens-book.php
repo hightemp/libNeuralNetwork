@@ -9,7 +9,7 @@ include '../src/Equation.php';
 include '../src/RNN.php';
 include '../src/LSTM.php';
 
-error_reporting(E_ERROR);
+//error_reporting(E_ERROR);
 
 $aTrainingData = [
   'Jane saw Doug.',
