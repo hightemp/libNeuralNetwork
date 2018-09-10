@@ -451,4 +451,54 @@ class RNN
       array_map(function($v) { return $v - 1; }, array_slice($aOutput, 0, count($aInput)))
     );
   }
+
+  public function fnTrain($aData, $aOptions = []) 
+  {
+    $aOptions = array_merge($this->fnTrainDefaults(), $aOptions);
+    $iIterations = $aOptions['iterations'];
+    $iErrorThresh = $aOptions['errorThresh'];
+    $oLog = $aOptions['log'] === true ? function($v) { echo $v."\n"; } : $aOptions['log'];
+    $iLogPeriod = $aOptions['logPeriod'];
+    $iLearningRate = $aOptions['learningRate'] || $this->learningRate;
+    $oCallback = $aOptions['callback'];
+    $iCallbackPeriod = $aOptions['callbackPeriod'];
+    $iError = INF;
+    $iI;
+
+    if ($this->fnSetupData) {
+      $aData = $this->fnSetupData($aData);
+    }
+
+    if (!$aOptions['keepNetworkIntact']) {
+      $this->fnInitialize();
+    }
+
+    for ($iI = 0; $iI < $iIterations && $iError > $iErrorThresh; $iI++) {
+      $iSum = 0;
+      for ($iJ = 0; $iJ < count($aData); $iJ++) {
+        $iErr = $this->fnTrainPattern($aData[$iJ], $iLearningRate);
+        $iSum += $iErr;
+      }
+      $iError = ($iSum / count($aData));
+
+      if ($iError == INF) 
+        throw new Exception('network error rate is unexpected NaN, check network configurations and try again');
+      
+      if ($oLog && ($iI % $iLogPeriod == 0)) {
+        $oLog('iterations:', $iI, 'training error:', $iError);
+      }
+      if ($oCallback && ($iI % $iCallbackPeriod == 0)) {
+        $oCallback([ 'error' => $iError, 'iterations' => $iI ]);
+      }
+    }
+
+    return [
+      'error' => $iError,
+      'iterations' => $iI
+    ];
+  }
+
+  public function fnTest($aData) {
+    throw new Exception('not yet implemented');
+  }
 }
