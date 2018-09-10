@@ -62,8 +62,7 @@ class Utilities
     $aOutput = $oNet->fnRun($aInput);
     $iMaxProp = null;
     $iMaxValue = -1;
-    foreach ($aOutput as $iProp) {
-      $iValue = $aOutput[$iProp];
+    foreach ($aOutput as $iProp => $iValue) {
       if ($iValue > $iMaxValue) {
         $iMaxProp = $iProp;
         $iMaxValue = $iValue;

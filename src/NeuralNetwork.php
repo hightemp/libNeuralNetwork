@@ -567,7 +567,7 @@ class NeuralNetwork
     }
     // turn sparse hash input into arrays with 0s as filler
     $mDatum = $aData[0]['input'];
-    if (!is_array($mDatum)) {
+    if (is_array($mDatum)) {
       if (!$this->inputLookup) {
         $this->inputLookup = Lookup::fnBuildLookup(
           array_map(function($v) { return $v['input']; }, $aData)
@@ -578,14 +578,15 @@ class NeuralNetwork
         {
           $aArray = Lookup::fnToArray($this->inputLookup, $v['input']);
           return array_merge($v, [ 'input' => $aArray ]);
-        }
+        },
+        $aData
       );
     }
 
-    if (!is_array($aData[0]['output'])) {
+    if (is_array($aData[0]['output'])) {
       if (!$this->outputLookup) {
         $this->outputLookup = Lookup::fnBuildLookup(
-          array_map(function($v) { return $v['output']; })
+          array_map(function($v) { return $v['output']; }, $aData)
         );
       }
       $aData = array_map(
@@ -593,7 +594,8 @@ class NeuralNetwork
         {
           $aArray = Lookup::fnToArray($this->outputLookup, $v['output']);
           return array_merge($v, [ 'output' => $aArray ]);
-        }
+        },
+        $aData
       );
     }
     

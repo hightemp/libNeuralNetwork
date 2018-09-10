@@ -43,7 +43,7 @@ class Lookup
       $aHash[$sKey] = $aArray[$mValue];
     }
     
-    return hash;
+    return $aHash;
   }
 
   public static function fnLookupFromArray($aArray) {
