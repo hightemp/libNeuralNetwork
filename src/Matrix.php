@@ -3,13 +3,14 @@
 namespace libNeuralNetwork;
 
 use libNeuralNetwork\Utilities;
+use Exception;
 
 class Matrix
 {
-  protected $rows;
-  protected $columns;
-  protected $weights;
-  protected $deltas;
+  public $rows;
+  public $columns;
+  public $weights;
+  public $deltas;
           
   function __construct($iRows, $iColumns) 
   {
@@ -245,7 +246,11 @@ class Matrix
   public static function fnRowPluckB(&$oProduct, &$oLeft, $iRowIndex) 
   {
     $iColumns = $oLeft->columns;
-    $iRowBase = $iColumns * $iRowIndex;
+    if (is_callable($iRowIndex)) {
+      $iRowBase = $iColumns * $iRowIndex();
+    } else {
+      $iRowBase = $iColumns * $iRowIndex;      
+    }
     for ($iColumn = 0; $iColumn < $iColumns; $iColumn++) {
       $oLeft->deltas[$iRowBase + $iColumn] = $oProduct->deltas[$iColumn];
     }

@@ -5,37 +5,39 @@ namespace libNeuralNetwork;
 use libNeuralNetwork\Matrix;
 use libNeuralNetwork\RandomMatrix;
 use libNeuralNetwork\DataFormatter;
+use Exception;
+use Closure;
 
 class RNN
 {
-  protected $inputSize;
-  protected $inputRange;
-  protected $hiddenSizes;
-  protected $outputSize;
-  protected $learningRate;
-  protected $decayRate;
-  protected $smoothEps;
-  protected $regc;
-  protected $clipval;
-  protected $json;
-  protected $dataFormatter;
+  public $inputSize;
+  public $inputRange;
+  public $hiddenSizes;
+  public $outputSize;
+  public $learningRate;
+  public $decayRate;
+  public $smoothEps;
+  public $regc;
+  public $clipval;
+  public $json;
+  public $dataFormatter;
   
-  protected $fnSetupData;
-  protected $fnFormatDataIn;
-  protected $fnFormatDataOut;
+  public $fnSetupData;
+  public $fnFormatDataIn;
+  public $fnFormatDataOut;
   
-  protected $stepCache;
-  protected $runs;
-  protected $totalCost;
-  protected $ratioClipped;
-  protected $model;
-  protected $initialLayerInputs;
-  protected $inputLookup;
-  protected $outputLookup;
+  public $stepCache;
+  public $runs;
+  public $totalCost;
+  public $ratioClipped;
+  public $model;
+  public $initialLayerInputs;
+  public $inputLookup;
+  public $outputLookup;
   
-  public static function fnDefaults()
+  public function fnDefaults()
   {
-    $aResult = [
+    return [
       'inputSize' => 20,
       'inputRange' => 20,
       'hiddenSizes' => [20,20],
@@ -50,8 +52,8 @@ class RNN
       'fnSetupData' => function($aData) 
       {
         if (
-          is_string($aData[0])
-          && !is_array($aData[0])
+          !is_string($aData[0])
+          //&& !is_array($aData[0])
           && (
             !isset($aData[0]['input'])
             || !isset($aData[0]['output'])
@@ -94,9 +96,9 @@ class RNN
       {
         if ($this->dataFormatter) {
           if (isset($this->dataFormatter->indexTable['stop-input'])) {
-            return $this->dataFormatter->toIndexesInputOutput($aInput, $aOutput);
+            return $this->dataFormatter->fnToIndexesInputOutput($aInput, $aOutput);
           } else {
-            return $this->dataFormatter->toIndexes($aInput);
+            return $this->dataFormatter->fnToIndexes($aInput);
           }
         }
         return $aInput;
@@ -104,14 +106,14 @@ class RNN
       'fnFormatDataOut' => function($aInput, $aOutput) 
       {
         if ($this->dataFormatter) {
-          return join('', $this->dataFormatter->toCharacters($aOutput));
+          return join('', $this->dataFormatter->fnToCharacters($aOutput));
         }
         return $aOutput;
       },
     ];
   }
   
-  public static function fnTrainDefaults()
+  public function fnTrainDefaults()
   {
     return [
       'iterations' => 20000,
@@ -127,7 +129,7 @@ class RNN
   
   function __construct($aOptions=[]) 
   {
-    $aOptions = array_merge(self::fnDefaults(), $aOptions);
+    $aOptions = array_merge($this->fnDefaults(), $aOptions);
 
     foreach ($aOptions as $sKey => $mValue) {
       $this->$sKey = $mValue;
@@ -139,7 +141,7 @@ class RNN
     $this->ratioClipped = null;
     $this->model = null;
 
-    $this->initialLayerInputs = array_map(function() { new Matrix($this->hiddenSizes[0], 1); }, $this->hiddenSizes);
+    $this->initialLayerInputs = array_map(function() { return new Matrix($this->hiddenSizes[0], 1); }, $this->hiddenSizes);
     $this->inputLookup = null;
     $this->outputLookup = null;
     
@@ -177,7 +179,7 @@ class RNN
     $iPrevSize = $this->hiddenSizes[0];
 
     for ($iD = 1; $iD < count($this->hiddenSizes); $iD++) { // loop over depths
-      $iHiddenSize = $this->hiddenSizes[d];
+      $iHiddenSize = $this->hiddenSizes[$iD];
       array_push($this->model['hiddenLayers'], $this->fnGetModel($iHiddenSize, $iPrevSize));
       $iPrevSize = $iHiddenSize;
     }
@@ -226,7 +228,7 @@ class RNN
     //whd
     $this->model['outputConnector'] = new RandomMatrix(
       $this->outputSize + 1, 
-      $this->hiddenSizes[$this->hiddenSizes.length - 1], 
+      $this->hiddenSizes[count($this->hiddenSizes) - 1], 
       0.08
     );
     //0 is end, so add 1 to offset
@@ -253,7 +255,7 @@ class RNN
     array_push($aOutputs, $oOutput);
     // 1+ indices
     for ($iI = 1, $iMax = count($this->hiddenSizes); $iI < $iMax; $iI++) {
-      $oOutput = $this->fnGetEquation($oEquation, $oOutput, $aEquationConnection[i], $this->model['hiddenLayers'][$iI]);
+      $oOutput = $this->fnGetEquation($oEquation, $oOutput, $aEquationConnection[$iI], $this->model['hiddenLayers'][$iI]);
       array_push($aOutputs, $oOutput);
     }
 
@@ -315,7 +317,7 @@ class RNN
       $oLogProbabilities = $oOutput; // interpret output as log probabilities
       $oProbabilities = Matrix::fnSoftmax($oOutput); // compute the softmax probabilities
 
-      $iLog2ppl += -log2($oProbabilities->weights[$iTarget]); // accumulate base 2 log prob and do smoothing
+      $iLog2ppl += -log($oProbabilities->weights[$iTarget], 2); // accumulate base 2 log prob and do smoothing
       $iCost += -log($oProbabilities->weights[$iTarget]);
       // write gradients into log probabilities
       $oLogProbabilities->deltas = $oProbabilities->weights;
@@ -331,10 +333,10 @@ class RNN
     $iI = count($aInput);
     $aEquations = $this->model['equations'];
     while ($iI > 0) {
-      $aEquations[$iI]->runBackpropagate($aInput[$iI - 1] + 1);
+      $aEquations[$iI]->fnRunBackpropagate($aInput[$iI - 1] + 1);
       $iI--;
     }
-    $aEquations[0]->runBackpropagate(0);
+    $aEquations[0]->fnRunBackpropagate(0);
   }
   
   public function fnStep($iLearningRate = null) 
@@ -349,7 +351,7 @@ class RNN
     $aAllMatrices = &$this->model['allMatrices'];
     for ($iMatrixIndex = 0; $iMatrixIndex < count($aAllMatrices); $iMatrixIndex++) {
       $oMatrix = &$aAllMatrices[$iMatrixIndex];
-      if (!(is_array($iMatrixIndex, $this->stepCache))) {
+      if (!isset($this->stepCache[$iMatrixIndex])) {
         $this->stepCache[$iMatrixIndex] = Utilities::fnZeros($oMatrix->rows * $oMatrix->columns);
       }
       $aCache = $this->stepCache[$iMatrixIndex];
@@ -389,7 +391,9 @@ class RNN
   {
     if (!$this->fnIsRunnable()) 
       return null;
-    $aInput = $this->fnFormatDataIn($aRawInput);
+
+    $fnFormatDataIn = Closure::bind($this->fnFormatDataIn, $this);
+    $aInput = $fnFormatDataIn($aRawInput);
     $aOutput = [];
     $iI = 0;
     while (count($this->model['equations']) < $iMaxPredictionLength) {
@@ -446,7 +450,8 @@ class RNN
      * then the output looks like: [4, 2, 9,...]
      * so we then remove the erroneous data to get our true output
      */
-    return $this->fnFormatDataOut(
+    $fnFormatDataOut = Closure::bind($this->fnFormatDataOut, $this);
+    return $fnFormatDataOut(
       $aInput,
       array_map(function($v) { return $v - 1; }, array_slice($aOutput, 0, count($aInput)))
     );
@@ -466,7 +471,8 @@ class RNN
     $iI;
 
     if ($this->fnSetupData) {
-      $aData = $this->fnSetupData($aData);
+      $fnSetupData = Closure::bind($this->fnSetupData, $this);
+      $aData = $fnSetupData($aData);
     }
 
     if (!$aOptions['keepNetworkIntact']) {

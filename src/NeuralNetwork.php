@@ -7,21 +7,20 @@ use libNeuralNetwork\Utilities;
 
 class NeuralNetwork 
 {
-  protected $hiddenSizes;
-  protected $trainOpts;
-  protected $sizes;
-  protected $outputLayer;
-  protected $biases;
-  protected $weights;
-  protected $outputs;
-  protected $deltas;
-  protected $changes;
-  protected $errors;
-  protected $errorCheckInterval;
-  protected $activation;
-  protected $binaryThresh;
-  protected $hiddenLayers;
-  protected $activation;
+  public $hiddenSizes;
+  public $trainOpts;
+  public $sizes;
+  public $outputLayer;
+  public $biases;
+  public $weights;
+  public $outputs;
+  public $deltas;
+  public $changes;
+  public $errors;
+  public $errorCheckInterval;
+  public $activation;
+  public $binaryThresh;
+  public $hiddenLayers;
 
   public static function fnTrainDefaults()
   {

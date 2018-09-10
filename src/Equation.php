@@ -3,12 +3,13 @@
 namespace libNeuralNetwork;
 
 use libNeuralNetwork\Matrix;
+use Exception;
 
 class Equation
 {
-  protected $inputRow;
-  protected $inputValue;
-  protected $states;
+  public $inputRow;
+  public $inputValue;
+  public $states;
   
   function __construct()
   {
@@ -27,8 +28,8 @@ class Equation
       'left' => $oLeft,
       'right' => $oRight,
       'product' => $oProduct,
-      'forwardFn' => 'Matrix::fnAdd',
-      'backpropagationFn' => 'Matrix::fnAddB'
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnAdd',
+      'backpropagationFn' => 'libNeuralNetwork\Matrix::fnAddB'
     ]);
     return $oProduct;
   }
@@ -39,7 +40,7 @@ class Equation
     array_push($this->states, [
       'left' => $oProduct,
       'product' => $oProduct,
-      'forwardFn' => 'Matrix::fnAllOnes'
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnAllOnes'
     ]);
     return $oProduct;
   }
@@ -50,7 +51,7 @@ class Equation
     array_push($this->states, [
       'left' => $oM,
       'product' => $oProduct,
-      'forwardFn' => 'Matrix::fnCloneNegative'
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnCloneNegative'
     ]);
     return product;
   }
@@ -79,8 +80,8 @@ class Equation
       'left' => $oLeft,
       'right' => $oRight,
       'product' => $oProduct,
-      'forwardFn' => 'Matrix::fnMultiply',
-      'backpropagationFn' => 'Matrix::fnMultiplyB'
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnMultiply',
+      'backpropagationFn' => 'libNeuralNetwork\Matrix::fnMultiplyB'
     ]);
     return $oProduct;
   }
@@ -95,8 +96,8 @@ class Equation
       'left' => $oLeft,
       'right' => $oRight,
       'product' => $oProduct,
-      'forwardFn' => 'Matrix::fnMultiplyElement',
-      'backpropagationFn' => 'Matrix::fnMultiplyElementB'
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnMultiplyElement',
+      'backpropagationFn' => 'libNeuralNetwork\Matrix::fnMultiplyElementB'
     ]);
     return $oProduct;
   }
@@ -107,8 +108,8 @@ class Equation
     array_push($this->states, [
       'left' => $oM,
       'product' => $oProduct,
-      'forwardFn' => 'Matrix::fnRelu',
-      'backpropagationFn' => 'Matrix::fnReluB'
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnRelu',
+      'backpropagationFn' => 'libNeuralNetwork\Matrix::fnReluB'
     ]);
     return $oProduct;
   }
@@ -135,10 +136,10 @@ class Equation
         return $oSelf->inputRow;
       },
       'product' => $oProduct,
-      'forwardFn' => 'Matrix::rowPluck',
-      'backpropagationFn' => 'Matrix::rowPluckB'
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnRowPluck',
+      'backpropagationFn' => 'libNeuralNetwork\Matrix::fnRowPluckB'
     ]);
-    return product;
+    return $oProduct;
   }
 
   public function fnSigmoid($oM) 
@@ -147,8 +148,8 @@ class Equation
     array_push($this->states, [
       'left' => $oM,
       'product' => $oProduct,
-      //'forwardFn' => sigmoid,
-      //'backpropagationFn' => sigmoidB
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnSigmoid',
+      'backpropagationFn' => 'libNeuralNetwork\Matrix::fnSigmoidB'
     ]);
     return $oProduct;
   }
@@ -159,8 +160,8 @@ class Equation
     array_push($this->states, [
       'left' => $oM,
       'product' => $oProduct,
-      //'forwardFn' => tanh,
-      //'backpropagationFn' => tanhB
+      'forwardFn' => 'libNeuralNetwork\Matrix::fnTanh',
+      'backpropagationFn' => 'libNeuralNetwork\Matrix::fnTanhB'
     ]);
     return $oProduct;
   }
@@ -186,10 +187,11 @@ class Equation
     $aState;
     for ($iI = 0, $iMax = count($this->states); $iI < $iMax; $iI++) {
       $aState = $this->states[$iI];
-      if (!isset($aState['forwardFn'])) {
+      if (!is_callable($aState['forwardFn'])) {
         continue;
       }
-      $aState['forwardFn']($aState['product'], $aState['left'], $aState['right']);
+      eval($aState['forwardFn'].'(@$aState["product"], @$aState["left"], @$aState["right"]);');
+      //call_user_func($aState['forwardFn'], @$aState['product'], @$aState['left'], @$aState['right']);
     }
 
     return $aState['product'];
@@ -201,10 +203,11 @@ class Equation
     $aState;
     for ($iI = 0, $iMax = count($this->states); $iI < $iMax; $iI++) {
       $aState = $this->states[$iI];
-      if (!isset($aState['forwardFn'])) {
+      if (!is_callable($aState['forwardFn'])) {
         continue;
       }
-      $aState['forwardFn']($aState['product'], $aState['left'], $aState['right']);
+      eval($aState['forwardFn'].'(@$aState["product"], @$aState["left"], @$aState["right"]);');
+      //call_user_func($aState['forwardFn'], @$aState['product'], @$aState['left'], @$aState['right']);
     }
 
     return $aState['product'];
@@ -218,10 +221,11 @@ class Equation
     $aState;
     while ($iI-- > 0) {
       $aState = $this->states[$iI];
-      if (!isset($aState['backpropagationFn'])) {
+      if (!is_callable($aState['backpropagationFn'])) {
         continue;
       }
-      $aState['backpropagationFn']($aState['product'], $aState['left'], $aState['right']);
+      eval($aState['backpropagationFn'].'(@$aState["product"], @$aState["left"], @$aState["right"]);');
+      //call_user_func($aState['backpropagationFn'], @$aState['product'], @$aState['left'], @$aState['right']);
     }
 
     return $aState['product'];

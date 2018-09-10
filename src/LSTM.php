@@ -90,7 +90,7 @@ class LSTM extends RNN
             $oPreviousResult
           )
         ),
-        hiddenLayer['outputBias']
+        $aHiddenLayer['outputBias']
       )
     );
 
