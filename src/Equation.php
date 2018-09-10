@@ -191,9 +191,7 @@ class Equation
         continue;
       }
       eval($aState['forwardFn'].'(@$aState["product"], @$aState["left"], @$aState["right"]);');
-      //call_user_func($aState['forwardFn'], @$aState['product'], @$aState['left'], @$aState['right']);
     }
-
     return $aState['product'];
   }
   
@@ -207,7 +205,6 @@ class Equation
         continue;
       }
       eval($aState['forwardFn'].'(@$aState["product"], @$aState["left"], @$aState["right"]);');
-      //call_user_func($aState['forwardFn'], @$aState['product'], @$aState['left'], @$aState['right']);
     }
 
     return $aState['product'];
@@ -225,7 +222,6 @@ class Equation
         continue;
       }
       eval($aState['backpropagationFn'].'(@$aState["product"], @$aState["left"], @$aState["right"]);');
-      //call_user_func($aState['backpropagationFn'], @$aState['product'], @$aState['left'], @$aState['right']);
     }
 
     return $aState['product'];

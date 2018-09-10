@@ -491,7 +491,7 @@ class RNN
         throw new Exception('network error rate is unexpected NaN, check network configurations and try again');
       
       if ($oLog && ($iI % $iLogPeriod == 0)) {
-        $oLog('iterations:', $iI, 'training error:', $iError);
+        $oLog('iterations: '. $iI. ' training error: '. $iError);
       }
       if ($oCallback && ($iI % $iCallbackPeriod == 0)) {
         $oCallback([ 'error' => $iError, 'iterations' => $iI ]);

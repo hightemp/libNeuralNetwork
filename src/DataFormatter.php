@@ -56,7 +56,6 @@ class DataFormatter
         array_push($this->characters, $sCharacter);
       }
     }
-    print_r($this->characters);
   }
 
   public function fnBuildTables($iMaxThreshold) 

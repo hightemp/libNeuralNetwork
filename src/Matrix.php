@@ -172,7 +172,7 @@ class Matrix
           $oLeft->deltas[$iLeftIndex] = 0;
           $oRight->deltas[$iRightIndex] = 0;
         }
-        $oProduct->weights[$iRightRowBase + $iLeftColumn] = $iDot;
+        $oProduct->weights[$iRightRowBase + $iRightColumn] = $iDot;
       }
     }
   }

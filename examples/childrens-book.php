@@ -19,13 +19,13 @@ $aTrainingData = [
 ];
 
 $oLSTM = new libNeuralNetwork\LSTM();
-$aResult = $oLSTM->fnTrain($aTrainingData, [ 'iterations' => 1500 ]);
+$aResult = $oLSTM->fnTrain($aTrainingData, [ 'iterations' => 1500, 'log' => true ]);
 $sRun1 = $oLSTM->fnRun('Jane');
 $sRun2 = $oLSTM->fnRun('Doug');
 $sRun3 = $oLSTM->fnRun('Spot');
 $sRun4 = $oLSTM->fnRun('It');
 
-print_r($sRun1);
-print_r($sRun2);
-print_r($sRun3);
-print_r($sRun4);
+var_dump($sRun1);
+var_dump($sRun2);
+var_dump($sRun3);
+var_dump($sRun4);

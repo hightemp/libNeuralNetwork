@@ -33,7 +33,7 @@ class Utilities
   
   public static function fnRandomWeight() 
   {
-    return rand(0, 100000) / 100000 * 0.4 - 0.2;
+    return mt_rand(0, 100000) / 100000 * 0.4 - 0.2;
   }
   
   public static function fnRandos($iSize) 
@@ -74,12 +74,12 @@ class Utilities
   
   public static function fnRandomF($iA, $iB) 
   {
-    return (rand(0, 100000) / 100000) * ($iB - $iA) + $iA;
+    return (mt_rand(0, 100000) / 100000) * ($iB - $iA) + $iA;
   }
 
   public static function fnRandomI($iA, $iB)
   {
-    return rand($iA, $iB);
+    return mt_rand($iA, $iB);
   }
 
   public static function fnRandomN($iMu, $iStd) 

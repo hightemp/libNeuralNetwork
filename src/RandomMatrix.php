@@ -7,7 +7,7 @@ use libNeuralNetwork\Utilities;
 
 class RandomMatrix extends Matrix
 {
-  protected $std;
+  public $std;
   
   function __construct($iRows, $iColumns, $iStd) 
   {
