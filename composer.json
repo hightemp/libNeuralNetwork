@@ -1,0 +1,10 @@
+{
+    "name": "hightemp/lib-neural-network",
+    "description": "PHP Neural Network based on https://github.com/BrainJS/brain.js",
+    "type": "library",
+    "license": "MIT",
+    "require": {},
+    "autoload": {
+        "psr-4": {"libNeuralNetwork\\": "src/"}
+    }
+}

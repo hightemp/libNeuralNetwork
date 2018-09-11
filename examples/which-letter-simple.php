@@ -1,12 +1,6 @@
 <?php
 
-include '../src/Utilities.php';
-include '../src/Lookup.php';
-include '../src/DataFormatter.php';
-include '../src/Matrix.php';
-include '../src/RandomMatrix.php';
-include '../src/Equation.php';
-include '../src/NeuralNetwork.php';
+include '../vendor/autoload.php';
 
 error_reporting(E_ERROR);
 
@@ -56,10 +50,10 @@ $oNet->fnTrain([
 
 $sResult = libNeuralNetwork\Utilities::fnLikely(
   fnCharacter(
-    '.#####.' .
+    '.##.##.' .
     '#.....#' .
     '#.....#' .
-    '###.###' .
+    '.##.##.' .
     '#.....#' .
     '#.....#' .
     '#.....#'
