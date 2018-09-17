@@ -72,10 +72,17 @@ class DataFormatter
     }
   }
 
-  public function fnToIndexes($aValue, $iMaxThreshold = 0) 
+  public function fnToIndexes($mValue, $iMaxThreshold = 0) 
   {
     $aResult = [];
+    $aValue = [];
 
+    if (is_string($mValue))
+      $aValue = str_split($mValue);
+    
+    if (is_array($mValue))
+      $aValue = $mValue;
+    
     for ($iI = 0, $iMax = count($aValue); $iI < $iMax; $iI++) {
       $sCharacter = $aValue[$iI];
       $iIndex = $this->indexTable[$sCharacter];

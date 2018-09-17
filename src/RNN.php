@@ -79,8 +79,8 @@ class RNN
         } else {
           if ($this->dataFormatter === null) {
             for ($iI = 0; $iI < count($aData); $iI++) {
-              array_push($aValues, $aData[i]['input']);
-              array_push($aValues, $aData[i]['output']);
+              array_push($aValues, $aData[$iI]['input']);
+              array_push($aValues, $aData[$iI]['output']);
             }
             $this->dataFormatter = DataFormatter::fromArrayInputOutput($aValues);
           }
@@ -267,11 +267,11 @@ class RNN
   public function fnMapModel() 
   {
     $this->fnCreateInputMatrix();
-    if (!$this->model['input']) throw new Exception('net.model.input not set');
+    if (empty($this->model['input'])) throw new Exception('net.model.input not set');
     array_push($this->model['allMatrices'], $this->model['input']);
 
     $this->fnCreateHiddenLayers();
-    if (!count($this->model['hiddenLayers'])) throw new Exception('net.hiddenLayers not set');
+    if (empty(count($this->model['hiddenLayers']))) throw new Exception('net.hiddenLayers not set');
     for ($iI = 0, $iMax = count($this->model['hiddenLayers']); $iI < $iMax; $iI++) {
       foreach ($this->model['hiddenLayers'][$iI] as $mProperty) {
         array_push($this->model['allMatrices'], $mProperty);
@@ -279,8 +279,8 @@ class RNN
     }
 
     $this->fnCreateOutputMatrix();
-    if (!$this->model['outputConnector']) throw new Exception('net.model.outputConnector not set');
-    if (!$this->model['output']) throw new Exception('net.model.output not set');
+    if (empty($this->model['outputConnector'])) throw new Exception('net.model.outputConnector not set');
+    if (empty($this->model['output'])) throw new Exception('net.model.output not set');
 
     array_push($this->model['allMatrices'], $this->model['outputConnector']);
     array_push($this->model['allMatrices'], $this->model['output']);
@@ -301,7 +301,7 @@ class RNN
     $iLog2ppl = 0;
     $iCost = 0;
     $oEquation;
-    
+
     while (count($this->model['equations']) <= count($aInput) + 1) {//last is zero
       $this->fnBindEquation();
     }
@@ -464,7 +464,7 @@ class RNN
     $iErrorThresh = $aOptions['errorThresh'];
     $oLog = $aOptions['log'] === true ? function($v) { echo $v."\n"; } : $aOptions['log'];
     $iLogPeriod = $aOptions['logPeriod'];
-    $iLearningRate = $aOptions['learningRate'] || $this->learningRate;
+    $iLearningRate = isset($aOptions['learningRate']) ? $aOptions['learningRate'] : $this->learningRate;
     $oCallback = $aOptions['callback'];
     $iCallbackPeriod = $aOptions['callbackPeriod'];
     $iError = INF;
