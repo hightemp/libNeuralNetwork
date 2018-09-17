@@ -325,7 +325,7 @@ class RNN
     }
 
     $this->totalCost = $iCost;
-    return pow(2, $iLog2ppl / ($iMax - 1));
+    return pow(2, $iLog2ppl / ($iMax - 1 + 0.1));
   }
 
   public function fnRunBackpropagate($aInput) 
@@ -354,7 +354,7 @@ class RNN
       if (!isset($this->stepCache[$iMatrixIndex])) {
         $this->stepCache[$iMatrixIndex] = Utilities::fnZeros($oMatrix->rows * $oMatrix->columns);
       }
-      $aCache = $this->stepCache[$iMatrixIndex];
+      $aCache = &$this->stepCache[$iMatrixIndex];
       for ($iI = 0; $iI < count($oMatrix->weights); $iI++) {
         $iR = $oMatrix->deltas[$iI];
         $iW = $oMatrix->weights[$iI];
